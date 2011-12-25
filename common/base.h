@@ -261,6 +261,7 @@ void x264_reduce_fraction64( uint64_t *n, uint64_t *d );
 
 void x264_log_default( void *p_unused, int i_level, const char *psz_fmt, va_list arg );
 void x264_log_internal( int i_level, const char *psz_fmt, ... );
+void x264_log_file( char *p_file_name, int i_level, const char *psz_fmt, va_list arg );
 
 /* x264_malloc : will do or emulate a memalign
  * you have to use x264_free for buffers allocated with x264_malloc */

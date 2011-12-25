@@ -96,6 +96,36 @@ void x264_log_internal( int i_level, const char *psz_fmt, ... )
     va_end( arg );
 }
 
+void x264_log_file( char *p_file_name, int i_level, const char *psz_fmt, va_list arg )
+{
+    char *psz_prefix;
+    switch( i_level )
+    {
+        case X264_LOG_ERROR:
+            psz_prefix = "error";
+            break;
+        case X264_LOG_WARNING:
+            psz_prefix = "warning";
+            break;
+        case X264_LOG_INFO:
+            psz_prefix = "info";
+            break;
+        case X264_LOG_DEBUG:
+            psz_prefix = "debug";
+            break;
+        default:
+            psz_prefix = "unknown";
+            break;
+    }
+    FILE *p_log_file = x264_fopen( p_file_name, "ab" );
+    if( p_log_file )
+    {
+        fprintf( p_log_file, "x264 [%s]: ", psz_prefix );
+        x264_vfprintf( p_log_file, psz_fmt, arg );
+        fclose( p_log_file );
+    }
+}
+
 /****************************************************************************
  * x264_malloc:
  ****************************************************************************/
@@ -378,6 +408,7 @@ static void param_default( x264_param_t *param )
     param->p_log_private = NULL;
     param->i_log_level = X264_LOG_INFO;
     param->b_stylish = 0;
+    param->i_log_file_level = X264_LOG_INFO;
 
     /* */
     param->analyse.intra = X264_ANALYSE_I4x4 | X264_ANALYSE_I8x8;
@@ -1166,6 +1197,13 @@ static int param_parse( x264_param_t *p, const char *name, const char *value )
     }
     OPT("log")
         p->i_log_level = atoi(value);
+    OPT("log-file")
+        p->psz_log_file = strdup(value);
+    OPT("log-file-level")
+        if( !parse_enum( value, x264_log_level_names, &p->i_log_file_level ) )
+            p->i_log_file_level += X264_LOG_NONE;
+        else
+            p->i_log_file_level = atoi(value);
     OPT("dump-yuv")
         p->psz_dump_yuv = strdup(value);
     OPT2("analyse", "partitions")
