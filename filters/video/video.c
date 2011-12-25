@@ -42,6 +42,9 @@ static void register_vid_filter( cli_vid_filter_t *new_filter )
     register_vid_filter( &name##_filter );\
 }
 
+#define REGISTER_GPL_VFILTER( name ) \
+    if( HAVE_GPL ) REGISTER_VFILTER( name )
+
 void x264_register_vid_filters( void )
 {
     extern cli_vid_filter_t source_filter;
@@ -56,10 +59,13 @@ void x264_register_vid_filters( void )
 #endif
     REGISTER_VFILTER( crop );
     REGISTER_VFILTER( fix_vfr_pts );
+
+    REGISTER_VFILTER( hqdn3d );
+    REGISTER_VFILTER( pad );
     REGISTER_VFILTER( resize );
     REGISTER_VFILTER( select_every );
-#if HAVE_GPL
-#endif
+    REGISTER_VFILTER( vflip );
+    REGISTER_GPL_VFILTER( yadif );
 }
 
 int x264_init_vid_filter( const char *name, hnd_t *handle, cli_vid_filter_t *filter,
