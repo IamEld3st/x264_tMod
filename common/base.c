@@ -1273,6 +1273,8 @@ static int param_parse( x264_param_t *p, const char *name, const char *value )
         p->rc.f_aq_strength = atof(value);
     OPT("fgo")
         p->analyse.i_fgo = atoi(value);
+    OPT("fade-compensate")
+        p->rc.f_fade_compensate = atof(value);
     OPT("pass")
     {
         int pass = x264_clip3( atoi(value), 0, 3 );
