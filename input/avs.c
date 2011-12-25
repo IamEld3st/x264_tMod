@@ -84,6 +84,7 @@ typedef struct
     AVS_ScriptEnvironment *env;
     void *library;
     int num_frames;
+    int desired_bit_depth;
     struct
     {
         AVSC_DECLARE_FUNC( avs_clip_get_error );
@@ -459,12 +460,18 @@ static int open_file( char *psz_filename, hnd_t *p_handle, video_info_t *info, c
     }
     info->vfr = 0;
 
+    h->desired_bit_depth = opt->desired_bit_depth;
     if( opt->bit_depth > 8 )
     {
         FAIL_IF_ERROR( info->width & 3, "avisynth 16bit hack requires that width is at least mod4\n" );
         x264_cli_log( "avs", X264_LOG_INFO, "avisynth 16bit hack enabled\n" );
         info->csp |= X264_CSP_HIGH_DEPTH;
         info->width >>= 1;
+        if( opt->bit_depth == h->desired_bit_depth )
+        {
+            /* HACK: totally skips depth filter to prevent dither error */
+            info->csp |= X264_CSP_SKIP_DEPTH_FILTER;
+        }
     }
 
     *p_handle = h;
