@@ -377,6 +377,7 @@ static void param_default( x264_param_t *param )
     param->pf_log = x264_log_default;
     param->p_log_private = NULL;
     param->i_log_level = X264_LOG_INFO;
+    param->b_stylish = 0;
 
     /* */
     param->analyse.intra = X264_ANALYSE_I4x4 | X264_ANALYSE_I8x8;
@@ -457,6 +458,7 @@ static int param_apply_preset( x264_param_t *param, const char *preset )
         param->analyse.i_subpel_refine = 0;
         param->rc.i_aq_mode = 0;
         param->analyse.b_mixed_references = 0;
+        param->analyse.i_trellis = 0;
         param->i_bframe_adaptive = X264_B_ADAPT_NONE;
         param->rc.b_mb_tree = 0;
         param->analyse.i_weighted_pred = X264_WEIGHTP_NONE;
