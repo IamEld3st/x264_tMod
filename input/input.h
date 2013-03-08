@@ -50,6 +50,7 @@ typedef struct
     int input_range; /* user override input range */
     int desired_bit_depth;
     int demuxer_threads;
+    int b_accurate_fps;
 } cli_input_opt_t;
 
 /* properties of the source given by the demuxer */
