@@ -179,8 +179,8 @@ static int open_file( char *psz_filename, hnd_t *p_handle, cli_output_opt_t *opt
 
 #ifdef _WIN32
     /* GPAC doesn't support Unicode filenames. */
-    char ansi_filename[MAX_PATH];
-    FAIL_IF_ERR( !x264_ansi_filename( psz_filename, ansi_filename, MAX_PATH, 1 ), "mp4", "invalid ansi filename\n" );
+    char ansi_filename[MAX_PATH * 2];
+    FAIL_IF_ERR( !x264_ansi_filename( psz_filename, ansi_filename, MAX_PATH * 2, 1 ), "mp4", "invalid ansi filename\n" );
     p_mp4->p_file = gf_isom_open( ansi_filename, GF_ISOM_OPEN_WRITE, NULL );
 #else
     p_mp4->p_file = gf_isom_open( psz_filename, GF_ISOM_OPEN_WRITE, NULL );
@@ -230,7 +230,7 @@ static int set_param( hnd_t handle, x264_param_t *p_param )
         uint64_t dh = p_param->i_height << 16;
         double sar = (double)p_param->vui.i_sar_width / p_param->vui.i_sar_height;
         if( sar > 1.0 )
-            dw *= sar;
+            dw *= sar ;
         else
             dh /= sar;
         gf_isom_set_pixel_aspect_ratio( p_mp4->p_file, p_mp4->i_track, p_mp4->i_descidx, p_param->vui.i_sar_width, p_param->vui.i_sar_height );
