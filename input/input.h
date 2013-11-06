@@ -51,6 +51,7 @@ typedef struct
     int desired_bit_depth;
     int demuxer_threads;
     int b_accurate_fps;
+    char *lavf_decoder;
 } cli_input_opt_t;
 
 /* properties of the source given by the demuxer */
