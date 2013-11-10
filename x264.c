@@ -778,7 +778,8 @@ static void help( x264_param_t *defaults, int longhelp )
     H0( "\n" );
     H0( "Frame-type options:\n" );
     H0( "\n" );
-    H0( "  -I, --keyint <integer or \"infinite\"> Maximum GOP size [%d]\n", defaults->i_keyint_max );
+    H0( "  -I, --keyint <integer> <string or \"infinite\"> Maximum GOP size [%d]\n"
+        "                                  - auto: Set the keyint to fps * 10\n", defaults->i_keyint_max );
     H2( "  -i, --min-keyint <integer>  Minimum GOP size [auto]\n" );
     H2( "      --no-scenecut           Disable adaptive I-frame decision\n" );
     H2( "      --scenecut <integer>    How aggressively to insert extra I-frames [%d]\n", defaults->i_scenecut_threshold );
