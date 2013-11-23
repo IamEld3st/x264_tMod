@@ -1833,17 +1833,10 @@ x264_t *x264_encoder_open( x264_param_t *param )
         (h->sps->i_profile_idc == PROFILE_BASELINE || h->sps->i_profile_idc == PROFILE_MAIN) ) )
         strcpy( level, "1b" );
 
-    if( h->sps->i_profile_idc < PROFILE_HIGH10 )
-    {
-        x264_log( h, X264_LOG_INFO, "profile %s, level %s\n",
-            profile, level );
-    }
-    else
-    {
-        static const char * const subsampling[4] = { "4:0:0", "4:2:0", "4:2:2", "4:4:4" };
-        x264_log( h, X264_LOG_INFO, "profile %s, level %s, %s %d-bit\n",
-            profile, level, subsampling[CHROMA_FORMAT], BIT_DEPTH );
-    }
+    static const char * const subsampling[4] = { "4:0:0", "4:2:0", "4:2:2", "4:4:4" };
+    x264_log( h, X264_LOG_INFO, "AVC Encoder x264 core %d%s\n", X264_BUILD, X264_VERSION );
+    x264_log( h, X264_LOG_INFO, "profile: %s, level: %s, subsampling: %s, bit-depth: %d-bit\n",
+        profile, level, subsampling[CHROMA_FORMAT], BIT_DEPTH );
 
     char *opts = x264_param2string( &h->param, 0 );
     if( opts )
