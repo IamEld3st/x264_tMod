@@ -435,6 +435,7 @@ static int main_internal( int argc, char **argv )
     _setmode( _fileno( stdin ),  _O_BINARY );
     _setmode( _fileno( stdout ), _O_BINARY );
     _setmode( _fileno( stderr ), _O_BINARY );
+    SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED);
 #endif
 
     /* Parse command line */
@@ -467,6 +468,7 @@ static int main_internal( int argc, char **argv )
 #ifdef _WIN32
     SetConsoleTitleW( org_console_title );
     free( argv );
+    SetThreadExecutionState(ES_CONTINUOUS);
 #endif
 
     x264_log_done();
