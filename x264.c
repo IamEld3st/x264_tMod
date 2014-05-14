@@ -429,6 +429,10 @@ static int main_internal( int argc, char **argv )
     FAIL_IF_ERROR( x264_threading_init(), "unable to initialize threading\n" );
 
 #ifdef _WIN32
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    COORD size = {120,300};
+    SetConsoleScreenBufferSize(hConsole,size);
+
     FAIL_IF_ERROR( !get_argv_utf8( &argc, &argv ), "unable to convert command line to UTF-8\n" );
 
     GetConsoleTitleW( org_console_title, CONSOLE_TITLE_SIZE );
