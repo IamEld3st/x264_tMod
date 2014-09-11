@@ -66,6 +66,10 @@
 #include <ffms.h>
 #endif
 
+#if HAVE_LSMASH
+#include <lsmash.h>
+#endif
+
 #ifdef _WIN32
 #define CONSOLE_TITLE_SIZE 200
 static wchar_t org_console_title[CONSOLE_TITLE_SIZE] = L"";
@@ -375,6 +379,9 @@ static void print_version_info( void )
     printf( "x264 "X264_POINTVER"\n" );
 #else
     printf( "x264 0.%d.X\n", X264_BUILD );
+#endif
+#if HAVE_LSMASH
+    printf( "(lsmash %d.%d.%d)\n", LSMASH_VERSION_MAJOR, LSMASH_VERSION_MINOR, LSMASH_VERSION_MICRO );
 #endif
 #if HAVE_SWSCALE
     printf( "(libswscale %d.%d.%d)\n", LIBSWSCALE_VERSION_MAJOR, LIBSWSCALE_VERSION_MINOR, LIBSWSCALE_VERSION_MICRO );
