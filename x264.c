@@ -964,7 +964,24 @@ static void help( x264_param_t *defaults, int longhelp )
     H2( "      --timebase <int/int>    Specify timebase numerator and denominator\n"
         "                 <integer>    Specify timebase numerator for input timecode file\n"
         "                              or specify timebase denominator for other input\n" );
+    H2( "      --opts <integer>        Set level of writing options in SEI [%d]\n"
+        "                                  - 0: no information will be written in SEI\n"
+        "                                  - 1: write x264 information\n"
+        "                                  - 2: write x264 options\n"
+        "                                  - 3: write x264 information and options\n", defaults->i_opts_write );
+    H2( "Muxer specific:\n" );
+    H2( " [mp4/3gp/3g2/mov/flv]\n" );
     H2( "      --dts-compress          Eliminate initial delay with container DTS hack\n" );
+    H2( " [mp4/3gp/3g2/mov]\n" );
+    H2( "      --chapter <string>      Set the chapter list from chapter format file\n" );
+    H2( "      --chpl-with-bom         Add UTF-8 BOM to the chapter strings\n"
+        "                              in the chapter list. (experimental)\n" );
+    H2( "      --language <string>     Set the language by ISO639-2/T language codes\n" );
+    H2( "      --no-container-sar      Disable sample aspect ratio within the container\n" );
+    H2( "      --no-remux              Inhibit auto-remuxing for progressive download\n" );
+    H2( "      --force-display-size    Force display region size for video\n" );
+    H2( "      --fragments             Enable movie fragments structure\n" );
+    H2( "      --priming <integer>     Specify the number of priming samples for the copied audio\n" );
     H0( "\n" );
     H0( "Filtering:\n" );
     H0( "\n" );
@@ -1143,6 +1160,8 @@ static struct option long_options[] =
     { "dump-yuv",    required_argument, NULL, 0 },
     { "sps-id",      required_argument, NULL, 0 },
     { "aud",               no_argument, NULL, 0 },
+    { "opts",        required_argument, NULL, 0 },
+    { "no-opts",           no_argument, NULL, 0 },
     { "nr",          required_argument, NULL, 0 },
     { "cqm",         required_argument, NULL, 0 },
     { "cqmfile",     required_argument, NULL, 0 },
