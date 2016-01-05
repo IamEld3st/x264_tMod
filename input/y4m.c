@@ -74,6 +74,7 @@ static int open_file( char *psz_filename, hnd_t *p_handle, video_info_t *info, c
     int colorspace = X264_CSP_NONE;
     int alt_colorspace = X264_CSP_NONE;
     int alt_bit_depth  = 8;
+    info->num_frames  = 0;
     if( !h )
         return -1;
 
@@ -171,6 +172,12 @@ static int open_file( char *psz_filename, hnd_t *p_handle, video_info_t *info, c
                     tokstart += 6;
                     alt_colorspace = parse_csp_and_depth( tokstart, &alt_bit_depth );
                 }
+                else if( !strncmp( "LENGTH=", tokstart, 7 ) )
+                {
+                    tokstart += 7;
+                    info->num_frames = strtol( tokstart, &tokend, 10 );
+                    tokstart = tokend;
+                }
                 tokstart = strchr( tokstart, 0x20 );
                 break;
         }
@@ -193,7 +200,6 @@ static int open_file( char *psz_filename, hnd_t *p_handle, video_info_t *info, c
     FAIL_IF_ERROR( h->bit_depth < 8 || h->bit_depth > 16, "unsupported bit depth `%d'\n", h->bit_depth );
 
     info->thread_safe = 1;
-    info->num_frames  = 0;
     info->csp         = colorspace;
 
     if( h->bit_depth > 8 )
