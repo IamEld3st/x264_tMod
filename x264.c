@@ -1545,6 +1545,7 @@ static int parse( int argc, char **argv, x264_param_t *param, cli_opt_t *opt )
                 input_opt.bit_depth = atoi( optarg );
                 break;
             case OPT_OUTPUT_DEPTH:
+                input_opt.desired_bit_depth =
                 param->i_bitdepth = atoi( optarg );
                 break;
             case OPT_DTS_COMPRESSION:
