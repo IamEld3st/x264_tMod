@@ -40,6 +40,7 @@ typedef struct
     int next_frame;
     int vfr_input;
     cli_pic_t *first_pic;
+    AVCodecContext* cocon;
 } lavf_hnd_t;
 
 /* handle the deprecated jpeg pixel formats */
@@ -72,39 +73,87 @@ static int read_frame_internal( cli_pic_t *p_pic, lavf_hnd_t *h, int i_frame, vi
             return 0;
     }
 
-    AVCodecContext *c = h->lavf->streams[h->stream_id]->codec;
+    // Deprecated since ffmpeg ~3.1
+    // AVCodecContext *c = stream->codec;
+    // 
+    // AVCodecContext *c = h->lavf->streams[h->stream_id]->codec;
+    // Use the following
+    if (!h->cocon)
+    {
+        AVStream *stream = h->lavf->streams[h->stream_id];
+        AVCodec *codec = avcodec_find_decoder(stream->codecpar->codec_id);
+        h->cocon = avcodec_alloc_context3(codec);
+        avcodec_parameters_to_context(h->cocon, stream->codecpar);
+        avcodec_open2(h->cocon, codec, NULL);
+    }
 
     AVPacket pkt;
     av_init_packet( &pkt );
     pkt.data = NULL;
     pkt.size = 0;
 
+    int codec_ret = 0;
+    int fail = 0;
     while( i_frame >= h->next_frame )
     {
         int finished = 0;
         int ret = 0;
         do
         {
-            ret = av_read_frame( h->lavf, &pkt );
-
-            if( ret < 0 )
+            codec_ret = avcodec_receive_frame(h->cocon, h->frame);
+            // We are good, just leave the loop with our new frame
+            if(codec_ret == 0)
             {
-                av_init_packet( &pkt );
+                finished = 1;
+                break;
+            }
+            ret = av_read_frame(h->lavf, &pkt);
+
+            if(ret < 0)
+            {
+                av_init_packet(&pkt);
                 pkt.data = NULL;
                 pkt.size = 0;
             }
 
-            if( ret < 0 || pkt.stream_index == h->stream_id )
+            // We got a new valid packet, or EOF, let's feed it
+            if(ret < 0 || pkt.stream_index == h->stream_id)
             {
-                if( avcodec_decode_video2( c, h->frame, &finished, &pkt ) < 0 )
-                    x264_cli_log( "lavf", X264_LOG_WARNING, "video decoding failed on frame %d\n", h->next_frame );
+                // avcodec_decode_video2 deprecated
+                // avcodec_decode_video2(h->cocon, h->frame, &finished, &pkt)
+                // Use the following
+                codec_ret = avcodec_send_packet(h->cocon, &pkt);
+                // AVERROR(EAGAIN): not possible
+                // AVERROR(EINVAL): fvcked up
+                // AVERROR_EOF && pkt.data = NULL: continue
+                // 0: continue
+                if(codec_ret == AVERROR(EINVAL))
+                {
+                    x264_cli_log("lavf", X264_LOG_WARNING, "feeding input to decoder failed on frame %d\n", h->next_frame);
+                    fail = 1;
+                }
+                else
+                {
+                    codec_ret = avcodec_receive_frame(h->cocon, h->frame);
+                    // AVERROR(EAGAIN): not finished, retry
+                    // AVERROR(EINVAL): fvcked up
+                    // AVERROR_EOF: not possible unless stream.nb_frames > actual frames
+                    // 0: leave the loop
+                    if(codec_ret == AVERROR(EINVAL))
+                    {
+                        x264_cli_log("lavf", X264_LOG_WARNING, "video decoding failed on frame %d\n", h->next_frame);
+                        fail = 1;
+                    }
+                    else if(codec_ret == 0)
+                        finished = 1;
+                }
             }
 
-            if( ret >= 0 )
-                av_free_packet( &pkt );
-        } while( !finished && ret >= 0 );
+            if(ret >= 0)
+                av_packet_unref(&pkt);
+        } while(!finished && !fail && ret >= 0);
 
-        if( !finished )
+        if(!finished || fail)
             return -1;
 
         h->next_frame++;
@@ -113,9 +162,9 @@ static int read_frame_internal( cli_pic_t *p_pic, lavf_hnd_t *h, int i_frame, vi
     memcpy( p_pic->img.stride, h->frame->linesize, sizeof(p_pic->img.stride) );
     memcpy( p_pic->img.plane, h->frame->data, sizeof(p_pic->img.plane) );
     int is_fullrange   = 0;
-    p_pic->img.width   = c->width;
-    p_pic->img.height  = c->height;
-    p_pic->img.csp     = handle_jpeg( c->pix_fmt, &is_fullrange ) | X264_CSP_OTHER;
+    p_pic->img.width   = h->cocon->width;
+    p_pic->img.height  = h->cocon->height;
+    p_pic->img.csp     = handle_jpeg( h->cocon->pix_fmt, &is_fullrange ) | X264_CSP_OTHER;
 
     if( info )
     {
@@ -127,8 +176,9 @@ static int read_frame_internal( cli_pic_t *p_pic, lavf_hnd_t *h, int i_frame, vi
     if( h->vfr_input )
     {
         p_pic->pts = p_pic->duration = 0;
-        if( h->frame->pkt_pts != AV_NOPTS_VALUE )
-            p_pic->pts = h->frame->pkt_pts;
+        // pkt_pts deprecated, use pts instead
+        if( h->frame->pts != AV_NOPTS_VALUE )
+            p_pic->pts = h->frame->pts;
         else if( h->frame->pkt_dts != AV_NOPTS_VALUE )
             p_pic->pts = h->frame->pkt_dts; // for AVI files
         else if( info )
@@ -146,7 +196,9 @@ static int open_file( char *psz_filename, hnd_t *p_handle, video_info_t *info, c
     lavf_hnd_t *h = calloc( 1, sizeof(lavf_hnd_t) );
     if( !h )
         return -1;
+#if ( LIBAVFORMAT_VERSION_INT < AV_VERSION_INT(58,9,100) )
     av_register_all();
+#endif
     if( !strcmp( psz_filename, "-" ) )
         psz_filename = "pipe:";
 
@@ -174,35 +226,36 @@ static int open_file( char *psz_filename, hnd_t *p_handle, video_info_t *info, c
     FAIL_IF_ERROR( avformat_find_stream_info( h->lavf, NULL ) < 0, "could not find input stream info\n" );
 
     int i = 0;
-    while( i < h->lavf->nb_streams && h->lavf->streams[i]->codec->codec_type != AVMEDIA_TYPE_VIDEO )
+    while( i < h->lavf->nb_streams && h->lavf->streams[i]->codecpar->codec_type != AVMEDIA_TYPE_VIDEO )
         i++;
     FAIL_IF_ERROR( i == h->lavf->nb_streams, "could not find video stream\n" );
-    h->stream_id       = i;
-    h->next_frame      = 0;
-    AVStream *s        = h->lavf->streams[i];
-    AVCodecContext *c  = s->codec;
-    info->fps_num      = s->avg_frame_rate.num;
-    info->fps_den      = s->avg_frame_rate.den;
-    info->timebase_num = s->time_base.num;
-    info->timebase_den = s->time_base.den;
+    h->stream_id          = i;
+    h->next_frame         = 0;
+    AVStream *s           = h->lavf->streams[i];
+    // s->codec deprecated, use codecpar instead
+    AVCodecParameters *cp = s->codecpar;
+    info->fps_num         = s->avg_frame_rate.num;
+    info->fps_den         = s->avg_frame_rate.den;
+    info->timebase_num    = s->time_base.num;
+    info->timebase_den    = s->time_base.den;
     /* lavf is thread unsafe as calling av_read_frame invalidates previously read AVPackets */
     info->thread_safe  = 0;
     h->vfr_input       = info->vfr;
+
+    AVCodec *codec = avcodec_find_decoder(cp->codec_id);
+    h->cocon = avcodec_alloc_context3(codec);
+    avcodec_parameters_to_context(h->cocon, cp);
+    avcodec_open2(h->cocon, codec, NULL);
 
     if( !opt->b_accurate_fps )
         x264_ntsc_fps( &info->fps_num, &info->fps_den );
 
     if( opt->demuxer_threads > 1 )
-        c->thread_count = opt->demuxer_threads;
+        h->cocon->thread_count = opt->demuxer_threads;
 
-    AVCodec *p;
-    if( opt->lavf_decoder )
-        p = avcodec_find_decoder_by_name(opt->lavf_decoder);
-    else
-        p = avcodec_find_decoder(c->codec_id);
     AVDictionary *avcodec_opts = NULL;
     av_dict_set( &avcodec_opts, "strict", "-2", 0 );
-    FAIL_IF_ERROR( avcodec_open2( c, p, &avcodec_opts ),
+    FAIL_IF_ERROR( avcodec_open2( h->cocon, codec, &avcodec_opts ),
                    "could not find decoder for video stream\n" );
     if( avcodec_opts )
         av_dict_free( &avcodec_opts );
@@ -214,28 +267,30 @@ static int open_file( char *psz_filename, hnd_t *p_handle, video_info_t *info, c
     if( read_frame_internal( h->first_pic, h, 0, info ) )
         return -1;
 
-    info->width      = c->width;
-    info->height     = c->height;
+    info->width      = cp->width;
+    info->height     = cp->height;
     info->csp        = h->first_pic->img.csp;
     info->num_frames = s->nb_frames;
-    info->sar_height = c->sample_aspect_ratio.den;
-    info->sar_width  = c->sample_aspect_ratio.num;
-    info->fullrange |= c->color_range == AVCOL_RANGE_JPEG;
+    info->sar_height = cp->sample_aspect_ratio.den;
+    info->sar_width  = cp->sample_aspect_ratio.num;
+    info->fullrange |= cp->color_range == AVCOL_RANGE_JPEG;
 
     /* -1 = 'unset' (internal) , 2 from lavf|ffms = 'unset' */
-    if( c->colorspace >= 0 && c->colorspace <= 8 && c->colorspace != 2 )
-        info->colormatrix = c->colorspace;
+    if( cp->color_space >= 0 && cp->color_space <= 8 && cp->color_space != 2 )
+        info->colormatrix = cp->color_space;
     else
         info->colormatrix = -1;
 
+    enum AVPixelFormat pix_fmt = (enum AVPixelFormat)cp->format;
+
     /* avisynth stores rgb data vertically flipped. */
     if( !strcasecmp( get_filename_extension( psz_filename ), "avs" ) &&
-        (c->pix_fmt == AV_PIX_FMT_BGRA || c->pix_fmt == AV_PIX_FMT_BGR24) )
+        (pix_fmt == AV_PIX_FMT_BGRA || pix_fmt == AV_PIX_FMT_BGR24) )
         info->csp |= X264_CSP_VFLIP;
 
     /* show video info */
     double duration = s->duration * av_q2d(s->time_base);
-    const AVPixFmtDescriptor *pix_desc = av_pix_fmt_desc_get(c->pix_fmt);
+    const AVPixFmtDescriptor *pix_desc = av_pix_fmt_desc_get(pix_fmt);
     x264_cli_log( "lavf", X264_LOG_INFO,
                   "\n Format    : %s"
                   "\n Codec     : %s ( %s )"
@@ -244,7 +299,7 @@ static int open_file( char *psz_filename, hnd_t *p_handle, video_info_t *info, c
                   "\n Timebase  : %d/%d"
                   "\n Duration  : %d:%02d:%02d\n",
                   format ? format->name : h->lavf->iformat->name,
-                  p->name, p->long_name,
+                  codec->name, codec->long_name,
                   pix_desc->name,
                   s->avg_frame_rate.num, s->avg_frame_rate.den,
                   s->time_base.num, s->time_base.den,
@@ -277,7 +332,11 @@ static void picture_clean( cli_pic_t *pic, hnd_t handle )
 static int close_file( hnd_t handle )
 {
     lavf_hnd_t *h = handle;
-    avcodec_close( h->lavf->streams[h->stream_id]->codec );
+    // Deprecated since ffmpeg ~3.1
+    // avcodec_close( h->lavf->streams[h->stream_id]->codec );
+    // 
+    // Use the following
+    avcodec_free_context( &h->cocon) ;
     avformat_close_input( &h->lavf );
     av_frame_free( &h->frame );
     free( h );
