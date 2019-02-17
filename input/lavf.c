@@ -168,7 +168,9 @@ static int open_file( char *psz_filename, hnd_t *p_handle, video_info_t *info, c
     lavf_hnd_t *h = calloc( 1, sizeof(lavf_hnd_t) );
     if( !h )
         return -1;
+#if ( LIBAVFORMAT_VERSION_INT < AV_VERSION_INT(58,9,100) )
     av_register_all();
+#endif
     if( !strcmp( psz_filename, "-" ) )
         psz_filename = "pipe:";
 
